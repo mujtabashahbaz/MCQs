@@ -1,5 +1,6 @@
 import streamlit as st
 from docx import Document
+import random
 import re
 
 def extract_mcqs_from_docx(file_path):
@@ -37,18 +38,25 @@ def quiz_app(questions):
     """Runs the quiz app."""
     st.title("MCQ Quiz Game")
     st.markdown("Test your knowledge with the MCQs!")
-    
+
+    # Initialize session state
     if "current_question_index" not in st.session_state:
         st.session_state.current_question_index = 0
         st.session_state.score = 0
+        st.session_state.questions_order = random.sample(range(len(questions)), len(questions))  # Random order
         st.session_state.completed = False
 
     if st.session_state.current_question_index < len(questions):
-        question = questions[st.session_state.current_question_index]
+        question_index = st.session_state.questions_order[st.session_state.current_question_index]
+        question = questions[question_index]
+
+        # Display score
+        st.sidebar.subheader(f"Current Score: {st.session_state.score}/{st.session_state.current_question_index}")
+        
         st.subheader(f"Question {st.session_state.current_question_index + 1}")
         st.write(question["question"])
         
-        selected_option = st.radio("Select your answer:", question["options"])
+        selected_option = st.radio("Select your answer:", question["options"], key=st.session_state.current_question_index)
         
         if st.button("Submit Answer"):
             correct_option = question["options"][ord(question["answer"]) - ord("A")]
@@ -59,7 +67,13 @@ def quiz_app(questions):
                 st.error(f"Incorrect. Correct answer: {correct_option}")
                 st.markdown(f"**Explanation:** {question.get('reference', 'No reference provided.')}")
             
-            st.session_state.current_question_index += 1
+            # Enable "Next Question" button after submitting
+            st.session_state.allow_next = True
+        
+        if st.session_state.get("allow_next", False):
+            if st.button("Next Question"):
+                st.session_state.current_question_index += 1
+                st.session_state.allow_next = False
 
     if st.session_state.current_question_index == len(questions):
         st.session_state.completed = True
@@ -67,14 +81,16 @@ def quiz_app(questions):
     if st.session_state.completed:
         st.balloons()
         st.subheader("Quiz Completed!")
-        st.write(f"Your score: {st.session_state.score} / {len(questions)}")
+        st.write(f"Your final score: {st.session_state.score} / {len(questions)}")
         st.button("Restart Quiz", on_click=reset_quiz)
 
 def reset_quiz():
     """Resets the quiz."""
     st.session_state.current_question_index = 0
     st.session_state.score = 0
+    st.session_state.questions_order = random.sample(range(len(st.session_state.questions)), len(st.session_state.questions))
     st.session_state.completed = False
+    st.session_state.allow_next = False
 
 def main():
     st.title("MCQ Quiz Generator")
@@ -83,6 +99,10 @@ def main():
     # Load the .docx file from the code repo
     file_path = "mcqs.docx"  # Replace with the actual file path in your repo
     questions = extract_mcqs_from_docx(file_path)
+
+    # Store questions in session state
+    if "questions" not in st.session_state:
+        st.session_state.questions = questions
 
     if questions:
         quiz_app(questions)
