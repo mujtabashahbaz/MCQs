@@ -4,23 +4,27 @@ import random
 import re
 
 def extract_mcqs_from_docx(file_path):
-    """Extracts MCQs from a .docx file located in the code repo."""
+    """Extracts MCQs and explanations from a .docx file."""
     document = Document(file_path)
     questions = []
     current_question = {}
     pattern_question = re.compile(r"QUESTION \d+", re.IGNORECASE)
     pattern_answer = re.compile(r"ANSWER: (\w)", re.IGNORECASE)
 
-    for paragraph in document.paragraphs:
+    for i, paragraph in enumerate(document.paragraphs):
         text = paragraph.text.strip()
         if pattern_question.match(text):
             if current_question:
                 questions.append(current_question)
-            current_question = {"question": "", "options": [], "answer": "", "reference": ""}
+            current_question = {"question": "", "options": [], "answer": "", "explanation": "", "reference": ""}
         elif text.startswith("ANSWER:"):
             match = pattern_answer.match(text)
             if match:
                 current_question["answer"] = match.group(1)
+            # The explanation is assumed to be in the next paragraph
+            if i + 1 < len(document.paragraphs):
+                next_paragraph = document.paragraphs[i + 1].text.strip()
+                current_question["explanation"] = next_paragraph
         elif text.startswith("Reference:"):
             current_question["reference"] = text.replace("Reference:", "").strip()
         elif current_question and not current_question["answer"]:
@@ -65,7 +69,10 @@ def quiz_app(questions):
                 st.session_state.score += 1
             else:
                 st.error(f"Incorrect. Correct answer: {correct_option}")
-                st.markdown(f"**Explanation:** {question.get('reference', 'No reference provided.')}")
+            
+            # Show the explanation
+            st.markdown(f"**Explanation:** {question.get('explanation', 'No explanation provided.')}")
+            st.markdown(f"**Reference:** {question.get('reference', 'No reference provided.')}")
             
             # Enable "Next Question" button after submitting
             st.session_state.allow_next = True
